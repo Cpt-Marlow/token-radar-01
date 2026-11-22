@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pre-token radar: protocols ranked by implied value</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="masthead">
+  <p class="eyebrow">make.fun &middot; token-radar-01</p>
+  <h1>Pre-token radar</h1>
+  <p class="lede">Every protocol in the sealed snapshot that records no token, ranked by what a token could be worth if the protocol&rsquo;s record stayed as it is. The figure is this entry&rsquo;s own claim, not make.fun&rsquo;s forecast, and it is not a prediction that a token will be issued.</p>
+  <dl class="facts" id="facts"></dl>
+  <p class="coverage" id="coverage-line"></p>
+  <p class="coverage" id="agree-line"></p>
+</header>
+
+<main>
+  <nav class="views" aria-label="View">
+    <button type="button" id="view-board" aria-pressed="true">The board</button>
+    <button type="button" id="view-well" aria-pressed="false">The well</button>
+  </nav>
+
+  <section class="panel" id="board-panel" aria-labelledby="board-title">
+    <div class="panel-head">
+      <h2 id="board-title">The board</h2>
+      <p class="hint" id="count" aria-live="polite"></p>
+    </div>
+    <form class="controls" autocomplete="off">
+      <label class="field">
+        <span>Search</span>
+        <input id="q" type="search" placeholder="protocol, chain, category" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Category</span>
+        <select id="category"><option value="all">All categories</option></select>
+      </label>
+      <label class="field">
+        <span>Chain</span>
+        <select id="chain"><option value="all">All chains</option></select>
+      </label>
+      <label class="field">
+        <span>Sort by</span>
+        <select id="sort">
+          <option value="implied">Implied value</option>
+          <option value="tvl">TVL</option>
+          <option value="growth">Seven-day change</option>
+          <option value="age">Days without a token</option>
+          <option value="name">Name</option>
+        </select>
+      </label>
+      <button type="button" id="dir" class="ghost" aria-pressed="true">Highest first</button>
+      <label class="check"><input id="floor" type="checkbox"> Watchlist only</label>
+      <button type="button" id="reset" class="ghost">Reset</button>
+    </form>
+    <div class="table-wrap">
+      <table id="board-table">
+        <caption class="sr-only">Pre-token protocols ranked by implied value, with TVL, seven-day change, age and confidence</caption>
+        <colgroup>
+          <col class="c-rank"><col class="c-proto"><col class="c-tvl"><col class="c-change"><col class="c-age"><col class="c-value"><col class="c-grade">
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col" class="num">#</th>
+            <th scope="col">Protocol</th>
+            <th scope="col" class="num">TVL</th>
+            <th scope="col" class="num">7d</th>
+            <th scope="col" class="num">No token</th>
+            <th scope="col">Implied value</th>
+            <th scope="col" class="grade">Grade</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p class="empty" id="empty" hidden>Nothing matches that search. Clear the filters, or pick another category.</p>
+    </div>
+    <p class="legend"><span class="swatch swatch-a"></span> A: TVL above a billion, a reported weekly change and a known listing date. <span class="swatch swatch-b"></span> B: two of the three. <span class="swatch swatch-c"></span> C: one, or a value the two figures cannot carry. The bar behind each value is the model&rsquo;s low-to-high range for that row.</p>
+  </section>
+
+  <section class="panel" id="well-panel" aria-labelledby="well-title" hidden>
+    <div class="panel-head">
+      <h2 id="well-title">The well</h2>
+      <p class="hint">Every board row in orbit. Radius: implied value, the strongest nearest the well. Trail length and speed: this week&rsquo;s TVL change. Colour: confidence grade.</p>
+    </div>
+    <canvas id="well-canvas" height="600" role="img" aria-label="Board rows orbiting a well: radius by implied value, trail length by seven-day TVL change, colour by confidence grade. Every figure is also in the board."></canvas>
+    <p class="legend well-legend"><span class="swatch swatch-a"></span> A <span class="swatch swatch-b"></span> B <span class="swatch swatch-c"></span> C confidence, as on the board. A long bright trail is a protocol gaining TVL this week; a short trail is one that is flat or falling. The orbit is a reading of the same row, not a second model: speed is the seven-day change, and a ship hugging the well is the row with the highest implied value.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="live-title">
+    <div class="panel-head">
+      <h2 id="live-title">Tokens that already trade</h2>
+      <p class="hint">Kept apart from the board: their market price is the market&rsquo;s claim, not the model&rsquo;s.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <caption class="sr-only">Protocols whose token already trades, by market cap</caption>
+        <thead>
+          <tr>
+            <th scope="col">Protocol</th>
+            <th scope="col" class="num">Market cap</th>
+            <th scope="col" class="num">TVL</th>
+            <th scope="col" class="num">Cap / TVL</th>
+            <th scope="col" class="num">7d TVL</th>
+          </tr>
+        </thead>
+        <tbody id="live-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel methodology" aria-labelledby="method-title">
+    <h2 id="method-title">How the number is made</h2>
+    <p>The model is one function of three figures the snapshot already carries, and no protocol name ever changes the answer.</p>
+    <ol class="formula">
+      <li><code>base = TVL &times; category multiple</code> &mdash; the multiple is what a dollar of TVL has been worth in a franchise of that kind.</li>
+      <li><code>growth = clamp(seven-day TVL change, &minus;50% to +100%)</code>, and <code>growth factor = 1 + growth &times; 0.4</code>.</li>
+      <li><code>maturity = 0.70 + min(days tracked, 1095) / 1095 &times; 0.30</code> &mdash; a protocol that has run longer without a token carries more of the record the value rests on.</li>
+      <li><code>implied value = TVL &times; multiple &times; growth factor &times; maturity</code>, rounded to whole dollars.</li>
+      <li>The range re-runs the same arithmetic with the weekly change ten points weaker and stronger, so a row shows how much of its value rests on one week of data.</li>
+    </ol>
+    <table class="multiples" id="multiples">
+      <caption>The category multiples the model uses, and how many board rows each one prices. Push back on these first: they are assumptions, not measurements.</caption>
+      <thead><tr><th scope="col">Category group</th><th scope="col" class="num">Multiple</th><th scope="col" class="num">Rows</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="caveat">A protocol that records no token may still have one its DefiLlama record does not carry; the board says &ldquo;no token recorded&rdquo;, never &ldquo;no token&rdquo;. Farming a protocol spends real money on an unannounced outcome, so size every position as money you can leave for months.</p>
+    <section class="honesty" aria-labelledby="honesty-title">
+      <h3 id="honesty-title">What this is not</h3>
+      <ul>
+        <li>Not a prediction that any protocol will issue a token. The model prices a token <em>if</em> the record stayed as it is.</li>
+        <li>Not make.fun&rsquo;s forecast. The figure is this entry&rsquo;s own claim, computed from the sealed snapshot.</li>
+        <li>Not a valuation of a live market price. Protocols that already trade are kept on a separate table.</li>
+        <li>Not advice to farm. Every plan spends real money on an unannounced outcome.</li>
+      </ul>
+    </section>
+  </section>
+</main>
+
+<dialog id="detail" aria-labelledby="detail-name">
+  <div class="detail-head">
+    <div>
+      <p class="eyebrow" id="detail-rank"></p>
+      <h2 id="detail-name"></h2>
+      <p class="hint" id="detail-meta"></p>
+    </div>
+    <button type="button" class="ghost" id="detail-close">Close</button>
+  </div>
+  <div class="detail-grid">
+    <section>
+      <h3>The value</h3>
+      <p class="big" id="detail-value"></p>
+      <p class="hint" id="detail-range"></p>
+      <ul class="math" id="detail-math"></ul>
+      <h3>Why this row</h3>
+      <ul class="evidence" id="detail-evidence"></ul>
+    </section>
+    <section>
+      <h3>How to farm it</h3>
+      <p class="hint" id="detail-steps-summary"></p>
+      <ol class="steps" id="detail-steps"></ol>
+    </section>
+  </div>
+</dialog>
+
+<footer class="foot">
+  <p id="foot-line"></p>
+  <p class="hint">Ranked by implied value. A row is a claim about a token that does not exist yet, priced from the snapshot&rsquo;s TVL, its weekly change and the time tracked without a token.</p>
+</footer>
+
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
