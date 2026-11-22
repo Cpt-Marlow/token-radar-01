@@ -483,7 +483,7 @@
     ships.slice(0, 6).forEach(function (ship) {
       var angle = ship.angle + ship.speed * seconds;
       var rx = ship.radius;
-      var ry = ship.radius * tilt;
+      var ry = ship.radius * WELL_TILT;
       var x = cx + Math.cos(angle) * rx;
       var y = cy + Math.sin(angle) * ry;
       var right = x < cx;
